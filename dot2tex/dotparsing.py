@@ -16,9 +16,7 @@ import re
 import itertools
 import os
 import logging
-from itertools import izip
 import string
-from exceptions import KeyError, AttributeError
 
 import pyparsing
 from pyparsing import __version__ as pyparsing_version
@@ -72,7 +70,7 @@ def needs_quotes(s):
 
 
 def quote_if_necessary(s):
-    if not isinstance(s, basestring):
+    if not isinstance(s, str):
         return s
     tmp = s
     if needs_quotes(tmp):
@@ -121,7 +119,7 @@ def nsplit(seq, n=2):
     >>> nsplit('aabbcc',n=4)
     [('a', 'a', 'b', 'b')]
     """
-    return [xy for xy in izip(*[iter(seq)] * n)]
+    return [xy for xy in zip(*[iter(seq)] * n)]
 
 
 # The following function is from the pydot project
@@ -146,7 +144,7 @@ def __find_executables(path):
         was_quoted = True
 
     if os.path.isdir(path):
-        for prg in progs.keys():
+        for prg in list(progs.keys()):
             if progs[prg]:
                 continue
 
@@ -231,7 +229,7 @@ def find_graphviz():
 
     # Method 2 (Linux, Windows etc)
     #
-    if os.environ.has_key('PATH'):
+    if 'PATH' in os.environ:
         for path in os.environ['PATH'].split(os.pathsep):
             progs = __find_executables(path)
             if progs is not None:
@@ -243,7 +241,7 @@ def find_graphviz():
         # Try and work out the equivalent of "C:\Program Files" on this
         # machine (might be on drive D:, or in a different language)
         #
-        if os.environ.has_key('PROGRAMFILES'):
+        if 'PROGRAMFILES' in os.environ:
             # Note, we could also use the win32api to get this
             # information, but win32api may not be installed.
 
@@ -595,7 +593,7 @@ class DotDataParser(object):
             self.build_top_graph(tokens[0])
             return self.graph
 
-        except ParseException, err:
+        except ParseException as err:
             # print err.line
             # print " "*(err.column-1) + "^"
             # print err
@@ -615,46 +613,13 @@ class DotDataParser(object):
 
             return tokens[0]
 
-        except ParseException, err:
-            print err.line
-            print " " * (err.column - 1) + "^"
-            print err
+        except ParseException as err:
+            print(err.line)
+            print(" " * (err.column - 1) + "^")
+            print(err)
             return None
 
-
-from UserDict import DictMixin
-
-
-class OrderedDict(DictMixin):
-    def __init__(self):
-        self._keys = []
-        self._data = {}
-
-    def __setitem__(self, key, value):
-        if key not in self._data:
-            self._keys.append(key)
-        self._data[key] = value
-
-    def __getitem__(self, key):
-        return self._data[key]
-
-    def __delitem__(self, key):
-        del self._data[key]
-        self._keys.remove(key)
-
-    def __iter__(self):
-        for key in self._keys:
-            yield key
-
-    def keys(self):
-        return list(self._keys)
-
-    def copy(self):
-        ordered_dict_copy = OrderedDict()
-        ordered_dict_copy._data = self._data.copy()
-        ordered_dict_copy._keys = self._keys[:]
-        return ordered_dict_copy
-
+from collections import OrderedDict
 
 class DotDefaultAttr(object):
     def __init__(self, element_type, **kwds):
@@ -664,7 +629,7 @@ class DotDefaultAttr(object):
     def __str__(self):
         attrstr = ",".join(["%s=%s" % \
                             (quote_if_necessary(key), quote_if_necessary(val)) \
-                            for key, val in self.attr.items()])
+                            for key, val in list(self.attr.items())])
         if attrstr:
             attrstr = "[%s]" % attrstr
             return "%s%s;\n" % (self.element_type, attrstr)
@@ -695,7 +660,7 @@ class DotNode(object):
     def __str__(self):
         attrstr = ",".join(["%s=%s" % \
                             (quote_if_necessary(key), quote_if_necessary(val)) \
-                            for key, val in self.attr.items()])
+                            for key, val in list(self.attr.items())])
         if attrstr:
             attrstr = "[%s]" % attrstr
         return "%s%s;\n" % (quote_if_necessary(self.name), attrstr)
@@ -895,7 +860,7 @@ class DotGraph(object):
             del self._nodes[name]
             del self._allnodes[name]
         except:
-            raise DotParsingException, "Node %s does not exists" % name
+            raise DotParsingException("Node %s does not exists" % name)
 
     def get_node(self, nodename):
         """Return node with name=nodename
@@ -973,10 +938,10 @@ class DotGraph(object):
         self.attr.update(kwds)
         # self.set_default_graph_attr(kwds)
 
-    nodes = property(lambda self: self._nodes.itervalues())
-    allnodes = property(lambda self: self._allnodes.itervalues())
+    nodes = property(lambda self: iter(self._nodes.values()))
+    allnodes = property(lambda self: iter(self._allnodes.values()))
     allgraphs = property(lambda self: self._allgraphs.__iter__())
-    alledges = property(lambda self: flatten(self._alledges.itervalues()))
+    alledges = property(lambda self: flatten(iter(self._alledges.values())))
     edges = property(get_edges)
 
     def __str__(self):
@@ -986,7 +951,7 @@ class DotGraph(object):
             grstr = "".join(["%s%s" % (padding, n) for n in map(str, flatten(self.allitems))])
             attrstr = ",".join(["%s=%s" % \
                                 (quote_if_necessary(key), quote_if_necessary(val)) \
-                                for key, val in self.attr.items()])
+                                for key, val in list(self.attr.items())])
             if attrstr:
                 attrstr = "%sgraph [%s];" % (padding, attrstr)
             if not isinstance(self, DotSubGraph):
@@ -1004,13 +969,13 @@ class DotGraph(object):
         subgraphstr = "\n".join(["%s%s" % (padding, n) for n in map(str, self.subgraphs)])
 
         nodestr = "".join(["%s%s" % (padding, n) for n in \
-                           map(str, self._nodes.itervalues())])
+                           map(str, iter(self._nodes.values()))])
         edgestr = "".join(["%s%s" % (padding, n) for n in \
-                           map(str, flatten(self.edges.itervalues()))])
+                           map(str, flatten(iter(self.edges.values())))])
 
         attrstr = ",".join(["%s=%s" % \
                             (quote_if_necessary(key), quote_if_necessary(val)) \
-                            for key, val in self.attr.items()])
+                            for key, val in list(self.attr.items())])
         if attrstr:
             attrstr = "%sgraph [%s];" % (padding, attrstr)
         if not isinstance(self, DotSubGraph):
@@ -1047,7 +1012,7 @@ class DotEdge(object):
     def __str__(self):
         attrstr = ",".join(["%s=%s" % \
                             (quote_if_necessary(key), quote_if_necessary(val)) \
-                            for key, val in self.attr.items()])
+                            for key, val in list(self.attr.items())])
         if attrstr:
             attrstr = "[%s]" % attrstr
         return "%s%s %s %s%s %s;\n" % (quote_if_necessary(self.src.name), \
@@ -1086,9 +1051,9 @@ digraph G {
 if __name__ == '__main__':
     import pprint
 
-    print "Creating parser"
+    print("Creating parser")
     gp = DotDataParser()
     tok = gp.parse_dot_data_debug(testgraph)
     # dg = parse_dot_data(testgraph)
     pprint.pprint(tok)
-    print gp.graph
+    print(gp.graph)
